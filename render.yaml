@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: uav-flightcontrol
+    runtime: python
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: python -m pip install -r requirements.txt
+    startCommand: python start.py
+    healthCheckPath: /_stcore/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
