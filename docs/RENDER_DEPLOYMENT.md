@@ -75,7 +75,7 @@ There is no application login, rate limiting or durable mission database in this
 
 | Symptom | Check |
 | --- | --- |
-| Cannot find `ui/app.py` or requirements | Root Directory must be blank; verify `main` contains the published app. |
+| Cannot find `app.py` or requirements | Root Directory must be blank; verify `main` contains the published app. |
 | No listening port / deploy timeout | Use `python start.py`; remove localhost bindings and manually entered `PORT`. |
 | Dependency or Python errors | Use the committed requirements and `.python-version`; remove conflicting `PYTHON_VERSION` overrides, then rebuild. |
 | Blank map background | Verify static JSON URLs and browser access to CARTO tiles. No map token is required. |

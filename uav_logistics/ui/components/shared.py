@@ -3,7 +3,7 @@ import html
 import copy
 import logging
 import streamlit as st
-from ui.data import COLORS
+from uav_logistics.core.data import COLORS
 
 
 def friendly_ai_notice(mission: dict) -> str:

@@ -1,8 +1,8 @@
 """Session-local fleet, mission history and audit events."""
 import streamlit as st
 from datetime import datetime
-from ui.mission_engine import credential, settings
-from ui.data import *
+from uav_logistics.core.mission_engine import credential, settings
+from uav_logistics.core.data import *
 
 
 def resolve_api_key(value: str, configuration: dict | None = None) -> str:

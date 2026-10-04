@@ -1,10 +1,10 @@
 """Global identity and configuration-only sidebar."""
 import streamlit as st
-from ui.data import *
-from ui.mission_engine import credential, settings
-from ui.state import preset_changed, resolve_api_key
-from ui.components.shared import esc, markup, pill
-from ui.themes import THEMES
+from uav_logistics.core.data import *
+from uav_logistics.core.mission_engine import credential, settings
+from uav_logistics.ui.state import preset_changed, resolve_api_key
+from uav_logistics.ui.components.shared import esc, markup, pill
+from uav_logistics.ui.themes import THEMES
 
 
 def sidebar():

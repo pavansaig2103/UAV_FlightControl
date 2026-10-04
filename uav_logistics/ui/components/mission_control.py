@@ -1,11 +1,12 @@
 """Mission setup, authorization and live tactical monitoring only."""
 import time
 import streamlit as st
-from ui.data import *
-from ui.mission_engine import *
-from ui.state import add_event, resolve_api_key
-from ui.components.shared import *
-from ui.components.tactical_map import build_map
+from uav_logistics.core.data import *
+from uav_logistics.core.mission_engine import *
+from uav_logistics.ui.state import add_event, resolve_api_key
+from uav_logistics.ui.components.shared import *
+from uav_logistics.ui.components.tactical_map import build_map
+from uav_logistics.ui.components.reports import mission_outcome
 
 
 def telemetry_snapshot(mission):
@@ -20,7 +21,7 @@ def telemetry_snapshot(mission):
     if final:
         distance = 0
     arrived = bool(mission.get("delivered_at")) or mission["status"] == "DELIVERED"
-    arrival = "ARRIVED" if arrived else "CANCELLED" if mission["abort_requested"] else f"{mission['eta_minutes'] * (1 - mission['progress']):.1f} min"
+    arrival = "ARRIVED" if arrived else "CANCELLED" if mission["abort_requested"] or mission["status"] == "ABORTED" else f"{mission['eta_minutes'] * (1 - mission['progress']):.1f} min"
     heading = f"{performance['bearing']:.0f} deg {performance['cardinal']}"
     return dict(final=final, moving=moving, returning=returning, arrived=arrived,
                 label="FINAL" if final else "LIVE" if moving or mission["status"] == "PAUSED" else "PLANNED",
@@ -64,7 +65,7 @@ def request_panel():
                 st.text_area("Clinical emergency request", key="emergency_notes", height=100, disabled=active)
             execute = st.button("Execute Optimal Dispatch", type="primary", icon=":material/route:", width="stretch", disabled=active)
         if mission:
-            markup(f'<div class="mission-line"><span>{esc(mission["destination"]["name"])}</span>{pill(mission["triage"]["urgency"], "amber")}</div><div class="node-meta">{esc(mission["triage"]["item_type"])} / {mission["triage"]["payload_weight_kg"]:g} kg</div>')
+            markup(f'<div class="request-summary"><div class="mission-line"><span>{esc(mission["destination"]["name"])}</span>{pill(mission["triage"]["urgency"], "amber")}</div><div class="node-meta">{esc(mission["triage"]["item_type"])} / {mission["triage"]["payload_weight_kg"]:g} kg</div></div>')
     with authorization_col:
         authorization(mission)
     if execute:
@@ -107,9 +108,10 @@ def hud(mission):
               ("ROUTE", f"{route['distance_km']:.2f} km", BASE_BY_ID[drone["base_id"]].name, ""),
               ("COURSE", f"{perf['bearing']:.0f} deg {perf['cardinal']}", "Planned departure heading", ""),
               ("GROUND SPEED", f"{perf['ground_speed_kmph']:.0f} km/h", "Planned / wind adjusted", ""),
-              ("PLANNED ETA", f"{mission['eta_minutes']:.1f} min", "ARRIVED" if arrived else "CANCELLED" if mission["abort_requested"] else "Outbound delivery estimate", ""),
+              ("PLANNED ETA", f"{mission['eta_minutes']:.1f} min", "ARRIVED" if arrived else "CANCELLED" if mission["abort_requested"] or mission["status"] == "ABORTED" else "Outbound delivery estimate", ""),
               ("RISK / CLEARANCE", f"{risk['score_pct']:.1f}%", risk["classification"] + " / " + ("PASS" if mission["safety"]["clearance"] else "BLOCKED"), risk["color"])]
-    markup('<div class="hud">' + ''.join(f'<div class="metric-card"><div class="metric-label">{label}</div><div class="metric-value {color}">{esc(value)}</div><div class="metric-sub">{esc(detail)}</div></div>' for label, value, detail, color in values) + '</div>')
+    risk_style = "risk-blocked" if not mission["safety"]["clearance"] or risk["color"] == "red" else "risk-guarded" if risk["color"] == "amber" else "risk-clear"
+    markup('<div class="hud">' + ''.join(f'<div class="metric-card {risk_style if label == "RISK / CLEARANCE" else ""}"><div class="metric-label">{label}</div><div class="metric-value {color}">{esc(value)}</div><div class="metric-sub">{esc(detail)}</div></div>' for label, value, detail, color in values) + '</div>')
 
 
 def telemetry_group(title, values):
@@ -126,9 +128,9 @@ def active_aircraft_panel(mission):
     drone = mission["aircraft"]
     live = telemetry_snapshot(mission)
     perf = live["performance"]
-    title = "Mission Aircraft" if live["final"] else "Active Aircraft"
-    section("AIR", title, live["label"])
-    markup(f'<div class="aircraft-name blue">{drone["id"]}</div><div class="aircraft-role">{esc(drone["model"])}</div>' + pill(live["phase"], "green" if live["final"] and live["arrived"] else "cyan"))
+    section("AIR", "Mission Aircraft", live["label"])
+    phase_color = "red" if mission["abort_requested"] or mission["status"] == "ABORTED" else "green" if live["final"] and live["arrived"] else "blue"
+    markup(f'<div class="aircraft-name blue">{drone["id"]}</div><div class="aircraft-role">{esc(drone["model"])}</div>' + pill(live["phase"], phase_color))
     if live["final"]:
         # Keep the medical delivery location distinct from the aircraft's returned position.
         minutes, seconds = divmod(round(mission["eta_minutes"] * 60), 60)
@@ -157,7 +159,18 @@ def mission_phase_timeline(mission):
     phase = flight_phase(mission)
     index = 6 if phase == "RETURN / STANDBY" else names.index(phase) if phase in names else -1
     final = bool(mission and mission["status"] == "DELIVERED")
-    markup('<div class="phase-timeline">' + ''.join(f'<div class="{"done" if pos < index or final else "current" if pos == index else ""}"><span>{pos + 1:02d}</span>{name}</div>' for pos, name in enumerate(names)) + '</div>')
+    aborted = bool(mission and (mission["abort_requested"] or mission["status"] == "ABORTED"))
+    interrupted = names.index(flight_phase({**mission, "status": "IN FLIGHT"})) if aborted and mission["abort_requested"] else 0
+    states = []
+    for pos in range(len(names)):
+        if aborted:
+            state = "interrupted" if pos == interrupted else "done" if pos < interrupted else ""
+            if pos == 6 and mission["abort_requested"]:
+                state = "done" if mission["status"] == "ABORTED" else "current"
+        else:
+            state = "done" if pos < index or final else "current" if pos == index else ""
+        states.append(state)
+    markup('<div class="phase-timeline">' + ''.join(f'<div class="{states[pos]}"><span>{pos + 1:02d}</span>{name}</div>' for pos, name in enumerate(names)) + '</div>')
 
 
 def mission_controls(mission):
@@ -203,6 +216,9 @@ def live_operations():
             st.rerun()
         markup(f'<div class="mission-line"><span><b>{mission["id"]}</b> / {esc(mission["destination"]["name"])}</span>' + pill(mission["status"], "green" if mission["status"] == "DELIVERED" else "red" if mission["status"] in {"BLOCKED", "ABORTED"} else "cyan") + '</div>')
     hud(mission)
+    if mission and (mission["abort_requested"] or mission["status"] == "ABORTED"):
+        title, detail, color = mission_outcome(mission)
+        markup(f'<div class="report-state {color}"><strong>{esc(title)}</strong><p>{esc(detail)}</p></div>')
     if mission and mission.get("delivered_at"):
         markup(f'<div class="completion-strip"><strong>DELIVERY VERIFIED / MEDICAL NODE REACHED</strong><span>{esc(mission["destination"]["name"])} / {"Aircraft returned to hub" if mission["status"] == "DELIVERED" else "Return in progress"}</span></div>')
     map_col, support_col = st.columns([2.7, 1], gap="large")
@@ -222,7 +238,7 @@ def live_operations():
     mission_controls(mission)
     point = flight_position(mission) if mission else None
     values = [("ROUTE DEVIATION", f"+{mission['route'].get('deviation_pct', 0):.1f}%" if mission and mission["route"]["path"] else "Standby"),
-              ("DELIVERY", "ARRIVED" if mission and mission["progress"] >= 1 and not mission["abort_requested"] else f"{mission['progress'] * 100:.0f}%" if mission else "Standby"),
+              ("DELIVERY", "CANCELLED" if mission and (mission["abort_requested"] or mission["status"] == "ABORTED") else "ARRIVED" if mission and mission["progress"] >= 1 else f"{mission['progress'] * 100:.0f}%" if mission else "Standby"),
               ("ALTITUDE", f"{point[2]:.0f} m" if point else "Network standby"),
               ("POSITION / WGS84", f"{point[1]:.4f} N / {point[0]:.4f} E" if point else "Vijayawada sector")]
     markup('<div class="telemetry-strip">' + ''.join(f'<div><label>{label}</label><strong>{esc(value)}</strong></div>' for label, value in values) + '</div>')

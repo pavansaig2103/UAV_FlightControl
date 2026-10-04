@@ -1,15 +1,36 @@
 """Fleet comparison and safe operator reassignment."""
 import streamlit as st
-from ui.mission_engine import *
-from ui.state import add_event
-from ui.components.shared import *
-from ui.components.tactical_map import build_map
+from uav_logistics.core.mission_engine import *
+from uav_logistics.ui.state import add_event
+from uav_logistics.ui.components.shared import *
+from uav_logistics.ui.components.tactical_map import build_map
+
+
+def fleet_status(status):
+    return {
+        "READY": ("READY", "green"), "IDLE": ("IDLE", "green"),
+        "ACTIVE": ("ACTIVE", "blue"), "RECHARGING": ("CHARGING", "amber"),
+        "MAINTENANCE": ("MAINTENANCE", "red"), "RESERVED": ("RESERVED", "muted"),
+    }.get(status, (status, "muted"))
+
+
+def role_tag(drone):
+    role = drone["medical_role"]
+    if role == "ORGAN_TRANSPORT":
+        return "ORGAN"
+    if role == "AED_RESPONSE":
+        return "AED"
+    if "Heavy" in drone["model"]:
+        return "HEAVY"
+    if drone["cold_chain"]:
+        return "COLD-CHAIN"
+    return "EMERGENCY" if role == "EMERGENCY" else "MEDICAL"
 
 def fleet_comparison(mission: dict) -> None:
     left, right = st.columns([1.2, 1], gap="large")
     eligible = [row for row in mission["candidates"] if row["eligible"]]
     with left:
-        section("CSP", "Fleet Candidates", f"{len(eligible)} ELIGIBLE / {len(mission['candidates'])} SCANNED")
+        markup(f'<div class="node-meta candidate-summary">{len(eligible)} ELIGIBLE / {len(mission["candidates"])} SCANNED</div>')
         for rank, row in enumerate(eligible, 1):
             selected = row["id"] == mission["aircraft"]["id"] if mission["aircraft"] else False
             recommended = row["id"] == mission["original_recommendation"]
@@ -60,7 +81,6 @@ def fleet_view():
     counts += [(label, sum(row["status"] == status for row in fleet)) for label, status in
                (("ACTIVE", "ACTIVE"), ("CHARGING", "RECHARGING"), ("MAINTENANCE", "MAINTENANCE"), ("RESERVED", "RESERVED"))]
     markup('<div class="fleet-summary">' + ''.join(f'<div><label>{label}</label><strong>{count:02d}</strong></div>' for label, count in counts) + '</div>')
-    markup('<div class="sector-strip">' + ''.join(f'<div><label>{base.sector}</label><strong>{sum(row["status"] in AVAILABLE_STATUSES for row in fleet if row["base_id"] == base.id)} ready</strong></div>' for base in BASES) + '</div>')
     coverage, network = st.columns([1.6, 1], gap="large")
     with coverage:
         section("GEO", "Hub Network", "6 OPERATING SECTORS")
@@ -84,10 +104,11 @@ def fleet_view():
         base = BASE_BY_ID[drone["base_id"]]
         if sector != "All sectors" and base.sector != sector:
             continue
-        color = "green" if drone["status"] in AVAILABLE_STATUSES else "cyan" if drone["status"] == "ACTIVE" else "amber"
+        status, color = fleet_status(drone["status"])
+        role = role_tag(drone)
         specs = [("BATTERY", f"{drone['battery_pct']:.0f}%"), ("PAYLOAD", f"{drone['max_payload_kg']:g} kg"),
                  ("CRUISE", f"{drone['nominal_speed_kmph']} km/h"), ("RANGE", f"{drone['range_km']:g} km")]
-        cards.append(f'<div class="registry-item"><div class="mission-line"><strong>{drone["id"]}</strong>{pill(drone["status"], color)}</div><div class="role">{esc(drone["model"])}</div><div class="hub">{esc(base.name)}</div><div class="specs">' + ''.join(f'<div><label>{label}</label>{value}</div>' for label, value in specs) + '</div></div>')
+        cards.append(f'<div class="registry-item" data-status="{esc(drone["status"])}"><div class="mission-line"><strong>{drone["id"]}</strong>{pill(status, color)}</div><div class="role">{esc(drone["model"])}</div><div class="registry-meta"><span class="hub">{esc(base.name)}</span><span class="role-tag">{role}</span></div><div class="specs">' + ''.join(f'<div><label>{label}</label>{value}</div>' for label, value in specs) + '</div></div>')
     markup('<div class="registry-grid">' + ''.join(cards) + '</div>')
     if mission:
         section("CSP", "Current Mission Candidates", mission["id"])

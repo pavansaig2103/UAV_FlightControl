@@ -29,7 +29,7 @@ except ImportError:
     genai_types = None
 
 
-from ui.data import *
+from uav_logistics.core.data import *
 
 def settings() -> dict[str, str]:
     values = {key: value for key, value in dotenv_values(ROOT / ".env").items() if value is not None}

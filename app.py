@@ -1,4 +1,4 @@
-"""Launch the four-workspace application with `streamlit run ui/app.py`."""
+"""Launch the four-workspace application with `streamlit run app.py`."""
 from pathlib import Path
 import sys
 import time
@@ -12,20 +12,20 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
-# Direct Streamlit execution places ui/, rather than the project root, on sys.path.
-ROOT = Path(__file__).resolve().parents[1]
+# Keep package imports available when Streamlit executes the entry point.
+ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from ui.mission_engine import *
-from ui.state import initialize_state, add_event
-from ui.styles import inject_css
-from ui.components.header import sidebar, header
-from ui.components.mission_control import request_panel, live_operations
-from ui.components.fleet_network import fleet_view
-from ui.components.intelligence import intelligence_panel
-from ui.components.reports import flight_log_view
-from ui.components.shared import markup
+from uav_logistics.core.mission_engine import *
+from uav_logistics.ui.state import initialize_state, add_event
+from uav_logistics.ui.styles import inject_css
+from uav_logistics.ui.components.header import sidebar, header
+from uav_logistics.ui.components.mission_control import request_panel, live_operations
+from uav_logistics.ui.components.fleet_network import fleet_view
+from uav_logistics.ui.components.intelligence import intelligence_panel
+from uav_logistics.ui.components.reports import flight_log_view
+from uav_logistics.ui.components.shared import markup
 
 
 WORKSPACES = ["Mission Control", "Fleet & Network", "Autonomous Intelligence", "Flight Reports"]

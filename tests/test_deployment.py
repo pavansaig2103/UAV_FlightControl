@@ -10,8 +10,8 @@ from streamlit.testing.v1 import AppTest
 import yaml
 
 from start import build_command, main
-from ui import mission_engine
-from ui.state import resolve_api_key
+from uav_logistics.core import mission_engine
+from uav_logistics.ui.state import resolve_api_key
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.mark.parametrize("environment,port", [({}, "8501"), ({"PORT": "10000"}, "10000"), ({"PORT": "1"}, "1"), ({"PORT": "65535"}, "65535")])
 def test_launcher_binds_render_port(environment, port):
     command = build_command(environment)
-    assert command[:5] == [sys.executable, "-m", "streamlit", "run", "ui/app.py"]
+    assert command[:5] == [sys.executable, "-m", "streamlit", "run", "app.py"]
     assert command[command.index("--server.address") + 1] == "0.0.0.0"
     assert command[command.index("--server.port") + 1] == port
     assert command[command.index("--server.headless") + 1] == "true"
@@ -86,9 +86,9 @@ def test_root_environment_loading_and_process_priority(tmp_path, monkeypatch):
 
 def test_server_key_never_prefills_browser_widget(monkeypatch):
     configuration = {"GEMINI_API_KEY": "server-only-dummy-key", "GEMINI_MODEL": "gemini-2.5-flash"}
-    monkeypatch.setattr("ui.state.settings", lambda: configuration)
-    monkeypatch.setattr("ui.components.header.settings", lambda: configuration)
-    ui = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=20).run()
+    monkeypatch.setattr("uav_logistics.ui.state.settings", lambda: configuration)
+    monkeypatch.setattr("uav_logistics.ui.components.header.settings", lambda: configuration)
+    ui = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
     assert not ui.exception
     assert ui.text_input(key="api_key").value == ""
     assert ui.session_state["api_key"] == ""

@@ -3,15 +3,15 @@ import math
 import pydeck as pdk
 from pydeck.types import String
 import streamlit as st
-from ui.mission_engine import *
-from ui.themes import BASEMAP_STYLES, palette, rgb, theme_name
+from uav_logistics.core.mission_engine import *
+from uav_logistics.ui.themes import BASEMAP_STYLES, palette, rgb, theme_name
 
 LABEL_CHARACTERS = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- /")
 
 def build_map(mission: dict | None, view: str = "Tactical") -> pdk.Deck:
     mode = theme_name(getattr(st.session_state, "theme", "Light"))
     theme = palette(mode)
-    blue, teal, green, gold, red, amber = (rgb(theme[key]) for key in ("blue", "teal", "green", "gold", "red", "amber"))
+    blue, teal, green, gold, red, amber = (rgb(theme[key]) for key in ("map-aircraft", "map-waypoint", "map-hub", "map-destination", "map-hospital", "amber"))
     layers = []
     zones = [{**zone, "altitude": 160, "color": red + [35], "label": zone["name"]} for zone in RESTRICTED_ZONES]
     layers.append(pdk.Layer("PolygonLayer", zones, id="restriction-volumes", get_polygon="polygon", get_fill_color="color",
@@ -47,9 +47,9 @@ def build_map(mission: dict | None, view: str = "Tactical") -> pdk.Deck:
             center = to_xy(hazard["position"])
             ring = [to_geo((center[0] + math.cos(angle * math.pi / 24) * hazard["radius_km"], center[1] + math.sin(angle * math.pi / 24) * hazard["radius_km"])) for angle in range(48)]
             layers.append(pdk.Layer("PolygonLayer", [{"polygon": ring, "label": "Dynamic obstacle interference"}], id="dynamic-hazard", get_polygon="polygon", get_fill_color=amber + [65], get_line_color=amber + [230], get_elevation=130, extruded=view == "Tactical", line_width_min_pixels=2, stroked=True, pickable=True))
-        color = blue if mission["safety"]["clearance"] else red
-        layers.append(pdk.Layer("PathLayer", [{"path": path, "label": "Planned flight corridor"}], id="route-halo", get_path="path", get_color=color + [46], width_min_pixels=10, width_max_pixels=10))
-        layers.append(pdk.Layer("PathLayer", [{"path": path, "label": "Planned flight corridor"}], id="flight-corridor", get_path="path", get_color=color + [230], width_min_pixels=2, pickable=True))
+        color = rgb(theme["map-route"]) if mission["safety"]["clearance"] else red
+        layers.append(pdk.Layer("PathLayer", [{"path": path, "label": "Planned flight corridor"}], id="route-halo", get_path="path", get_color=color + [32], width_min_pixels=7, width_max_pixels=7))
+        layers.append(pdk.Layer("PathLayer", [{"path": path, "label": "Planned flight corridor"}], id="flight-corridor", get_path="path", get_color=color + [230], width_min_pixels=3, pickable=True))
         waypoints = []
         geometric = [[point[0], point[1]] for point in [path[int((len(path) - 1) * fraction)] for fraction in (0, 0.2, 0.4, 0.6, 0.85, 1)]]
         for index, position in enumerate(geometric):

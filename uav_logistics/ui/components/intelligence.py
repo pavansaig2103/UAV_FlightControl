@@ -1,8 +1,8 @@
 """Agent orchestration, measured execution and transparent decision analytics."""
 import streamlit as st
-from ui.data import *
-from ui.mission_engine import new_trace, payload_handling, role_fit
-from ui.components.shared import *
+from uav_logistics.core.data import *
+from uav_logistics.core.mission_engine import new_trace, payload_handling, role_fit
+from uav_logistics.ui.components.shared import *
 
 
 PHASES = [("Understand", [0, 1, 2]), ("Optimize", [3, 4]), ("Navigate", [5, 6]), ("Verify", [7, 8, 9])]
@@ -88,11 +88,10 @@ def intelligence_panel():
     else:
         markup('<div class="notice red">No aircraft met all dispatch constraints. Safety verification suppressed launch.</div>')
     markup('<div class="analytics-band"></div>')
-    section("TRACE", "AI Execution Trace", "MEASURED ENGINE DURATIONS")
-    elapsed = 0.0
-    entries = []
-    for index, row in enumerate(trace):
-        elapsed += row["seconds"] or 0
-        entries.append(f'<div class="timeline-entry"><time>{duration_label(elapsed)}</time><div><b>{AGENT_NAMES[index]}</b><p>{esc(row["detail"])}</p></div><span class="execution">{duration_label(row["seconds"])}</span></div>')
-    markup('<div class="timeline">' + ''.join(entries) + '</div>')
+    with st.expander("Detailed Execution Trace", expanded=False):
+        section("TRACE", "AI Execution Trace", "WALL CLOCK / ENGINE DURATION")
+        entries = []
+        for index, row in enumerate(trace):
+            entries.append(f'<div class="timeline-entry"><time>{esc(row.get("completed_at", "--"))}</time><div><b>{AGENT_NAMES[index]}</b><p>{esc(row["detail"])}</p></div><span class="execution">{duration_label(row["seconds"])}</span></div>')
+        markup('<div class="timeline">' + ''.join(entries) + '</div>')
     markup('<div class="notice muted">' + esc(friendly_ai_notice(mission)) + '</div>')

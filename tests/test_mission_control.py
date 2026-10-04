@@ -11,7 +11,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("mission_control", ROOT / "ui" / "app.py")
+SPEC = importlib.util.spec_from_file_location("mission_control", ROOT / "app.py")
 app = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = app
 SPEC.loader.exec_module(app)
@@ -20,7 +20,7 @@ SPEC.loader.exec_module(app)
 @pytest.fixture(autouse=True)
 def isolate_ambient_credentials(monkeypatch):
     # UI tests never pick up a developer's real key from their local environment.
-    monkeypatch.setattr("ui.state.settings", lambda: {})
+    monkeypatch.setattr("uav_logistics.ui.state.settings", lambda: {})
 
 
 def mission(**overrides):
@@ -147,7 +147,7 @@ def test_playback_pause_completion_and_idempotent_release():
 
 
 def test_streamlit_preset_dispatch_pause_resume_abort_and_new_dispatch():
-    ui = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=15)
+    ui = AppTest.from_file(str(ROOT / "app.py"), default_timeout=15)
     ui.session_state["api_key"] = ""
     ui.run()
     assert not ui.exception
@@ -266,7 +266,7 @@ def test_gemini_cannot_remove_explicit_cold_chain_or_downgrade_critical_request(
 
 
 def test_streamlit_override_persists_through_reruns():
-    ui = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=20)
+    ui = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
     ui.session_state["api_key"] = ""
     ui.run()
     next(button for button in ui.button if button.label == "Execute Optimal Dispatch").click().run()
@@ -284,7 +284,7 @@ def test_streamlit_override_persists_through_reruns():
 
 
 def test_four_workspaces_keep_operational_content_separate():
-    ui = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=20)
+    ui = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
     ui.session_state["api_key"] = ""
     ui.run()
     assert not ui.exception
@@ -297,7 +297,7 @@ def test_four_workspaces_keep_operational_content_separate():
 
 
 def test_final_telemetry_preserves_planned_eta_and_home_position():
-    from ui.components.mission_control import telemetry_snapshot
+    from uav_logistics.ui.components.mission_control import telemetry_snapshot
     fleet = app.fresh_fleet()
     result = mission(fleet=fleet)
     reserve(result, fleet)
@@ -317,7 +317,7 @@ def test_final_telemetry_preserves_planned_eta_and_home_position():
 
 
 def test_paused_and_aborted_telemetry_do_not_claim_live_cruise_or_arrival():
-    from ui.components.mission_control import telemetry_snapshot
+    from uav_logistics.ui.components.mission_control import telemetry_snapshot
     result = mission()
     result["status"] = "PAUSED"
     live = telemetry_snapshot(result)
@@ -328,7 +328,7 @@ def test_paused_and_aborted_telemetry_do_not_claim_live_cruise_or_arrival():
 
 
 def test_subsecond_agent_timings_are_not_rounded_to_zero():
-    from ui.components.intelligence import duration_label, pipeline_markup
+    from uav_logistics.ui.components.intelligence import duration_label, pipeline_markup
     assert duration_label(.00003) == "<0.1 ms"
     assert duration_label(.002) == "2.00 ms"
     result = mission()
@@ -339,7 +339,7 @@ def test_subsecond_agent_timings_are_not_rounded_to_zero():
 
 
 def test_handwritten_request_and_comparison_survive_workspace_reruns():
-    ui = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=20)
+    ui = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
     ui.session_state["api_key"] = ""
     ui.run()
     request = "Critical handwritten request for 2 kg O-negative blood."
@@ -359,7 +359,7 @@ def test_handwritten_request_and_comparison_survive_workspace_reruns():
 def test_return_map_does_not_connect_destination_to_live_aircraft():
     import json
     from types import SimpleNamespace
-    from ui.components import tactical_map
+    from uav_logistics.ui.components import tactical_map
     fleet = app.fresh_fleet()
     result = mission(fleet=fleet, hazard=True)
     reserve(result, fleet)
@@ -378,7 +378,7 @@ def test_return_map_does_not_connect_destination_to_live_aircraft():
 
 
 def test_api_key_priority_and_placeholder_fallback(monkeypatch):
-    from ui.state import resolve_api_key
+    from uav_logistics.ui.state import resolve_api_key
     monkeypatch.setenv("GEMINI_API_KEY", "environment-test-value")
     config = app.settings()
     assert resolve_api_key("operator-test-value", config) == "operator-test-value"
@@ -388,7 +388,7 @@ def test_api_key_priority_and_placeholder_fallback(monkeypatch):
 
 
 def test_friendly_fallback_preserves_original_diagnostics_and_clearance():
-    from ui.components.shared import presentation_mission
+    from uav_logistics.ui.components.shared import presentation_mission
     result = mission()
     result["ai_notice"] = "Gemini unavailable (HTTP 404); local parser completed triage"
     result["trace"][1]["detail"] = result["ai_notice"]
@@ -405,7 +405,7 @@ def test_all_workspaces_hide_raw_fallback_errors():
     result = mission()
     result["ai_notice"] = "Gemini unavailable (HTTP 404); local parser completed triage"
     result["trace"][1]["detail"] = result["ai_notice"]
-    ui = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=20)
+    ui = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
     ui.session_state["api_key"] = ""
     ui.run()
     reserve(result, ui.session_state["fleet"])
@@ -459,7 +459,7 @@ def test_secret_files_are_ignored_and_environment_examples_are_allowed(tmp_path)
 @pytest.mark.parametrize("wind", [18, 50])
 def test_document_summary_keeps_authorized_and_blocked_missions_readable(wind):
     result = mission(wind=wind)
-    ui = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=20)
+    ui = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
     ui.session_state["api_key"] = ""
     ui.run()
     ui.session_state["mission"] = result
@@ -476,14 +476,14 @@ def test_document_summary_keeps_authorized_and_blocked_missions_readable(wind):
 def test_daylight_basemap_uses_a_style_url_and_stable_map_labels():
     import json
     from types import SimpleNamespace
-    from ui.components import tactical_map
+    from uav_logistics.ui.components import tactical_map
     with patch.object(tactical_map.st, "session_state", SimpleNamespace(fleet=app.fresh_fleet(), destination_id="HOSP_03")):
         spec = json.loads(tactical_map.build_map(None).to_json())
     assert spec["mapStyle"] == "/app/static/daylight_basemap.json"
     assert spec["mapProvider"] == "carto"
-    style = json.loads((ROOT / "ui" / "static" / "daylight_basemap.json").read_text(encoding="utf-8"))
+    style = json.loads((ROOT / "static" / "daylight_basemap.json").read_text(encoding="utf-8"))
     assert style["sources"]["carto"]["url"].startswith("https://tiles.basemaps.cartocdn.com/")
-    assert next(layer for layer in style["layers"] if layer["id"] == "background")["paint"]["background-color"] == "#f7f9fc"
+    assert next(layer for layer in style["layers"] if layer["id"] == "background")["paint"]["background-color"] == "#f4f7fa"
     labels = next(layer for layer in spec["layers"] if layer["id"] == "network-labels")
     assert labels["fontFamily"] == "Arial"
     assert all(set(row["short"]) <= set(labels["characterSet"]) for row in labels["data"])
@@ -495,7 +495,7 @@ def test_daylight_basemap_uses_a_style_url_and_stable_map_labels():
 def test_route_camera_leaves_room_for_compact_map_viewports():
     import json
     from types import SimpleNamespace
-    from ui.components import tactical_map
+    from uav_logistics.ui.components import tactical_map
     result = mission()
     with patch.object(tactical_map.st, "session_state", SimpleNamespace(fleet=app.fresh_fleet(), destination_id="HOSP_03")):
         spec = json.loads(tactical_map.build_map(result).to_json())
@@ -507,19 +507,19 @@ def test_route_camera_leaves_room_for_compact_map_viewports():
 
 def test_light_theme_and_live_readout_refresh_styles():
     import tomllib
-    from ui.styles import theme_css
+    from uav_logistics.ui.styles import theme_css
     CSS = theme_css("Light")
     theme = tomllib.loads((ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8"))["theme"]
     assert theme["base"] == "light"
-    assert theme["textColor"] == "#202632"
+    assert theme["textColor"] == "#172434"
     assert "--surface:#ffffff" in CSS
     assert '.st-key-live-operations [data-testid="stElementContainer"][data-stale="true"]:has(' in CSS
-    assert 'st.container(key="live-operations")' in (ROOT / "ui" / "app.py").read_text(encoding="utf-8")
+    assert 'st.container(key="live-operations")' in (ROOT / "app.py").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("role", ["cyan", "blue", "green", "gold", "amber", "red", "muted"])
 def test_light_palette_text_meets_normal_text_contrast(role):
-    from ui.data import COLORS
+    from uav_logistics.core.data import COLORS
     channels = [int(COLORS[role][offset:offset + 2], 16) / 255 for offset in (1, 3, 5)]
     linear = [value / 12.92 if value <= .04045 else ((value + .055) / 1.055) ** 2.4 for value in channels]
     luminance = sum(value * weight for value, weight in zip(linear, (.2126, .7152, .0722)))
@@ -528,7 +528,7 @@ def test_light_palette_text_meets_normal_text_contrast(role):
 
 @pytest.mark.parametrize("status,color", [("PREFLIGHT", "green"), ("ABORTED", "red"), ("BLOCKED", "red")])
 def test_authorization_color_distinguishes_clearance_from_cancellation(status, color):
-    from ui.components import mission_control
+    from uav_logistics.ui.components import mission_control
     result = mission()
     result["status"] = status
     if status == "BLOCKED":

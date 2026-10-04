@@ -1,9 +1,9 @@
 """Unchanged city network, aircraft profiles and mission data types."""
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from ui.themes import LIGHT
+from uav_logistics.ui.themes import LIGHT
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 EARTH_RADIUS_KM = 6371.0088
 SIMULATION_SECONDS = 45.0
 ACTIVE_STATUSES = {"PREFLIGHT", "IN FLIGHT", "PAUSED", "RETURNING"}

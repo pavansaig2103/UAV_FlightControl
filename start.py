@@ -16,7 +16,7 @@ def build_command(environment: Mapping[str, str] | None = None) -> list[str]:
     if not 1 <= port <= 65535:
         raise ValueError("PORT must be an integer between 1 and 65535.")
     return [
-        sys.executable, "-m", "streamlit", "run", "ui/app.py",
+        sys.executable, "-m", "streamlit", "run", "app.py",
         "--server.address", "0.0.0.0", "--server.port", str(port),
         "--server.headless", "true", "--global.developmentMode", "false",
     ]
